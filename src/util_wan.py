@@ -39,25 +39,44 @@ def model_zoo(args):
         "llama-2-70b": 32000,
     }
     
-    # Local model paths
-    base_dir = "/common/home/hd535/pearl_wan/models"
-    zoo = {
+    # Prefer locally mounted model weights, then fall back to HuggingFace IDs.
+    base_dir = os.environ.get("PEARL_WAN_MODEL_DIR", "/workspace/models")
+    local_zoo = {
         "qwen2.5-0.5b-instruct": f"{base_dir}/qwen2.5-0.5b-instruct",
         "qwen2.5-1.5b-instruct": f"{base_dir}/qwen2.5-1.5b-instruct",
         "qwen2.5-7b-instruct": f"{base_dir}/qwen2.5-7b-instruct",
         "deepseek-1.3b": f"{base_dir}/deepseek-coder-1.3b-base",
         "deepseek-6.7b": f"{base_dir}/deepseek-coder-6.7b-base",
     }
+    hf_zoo = {
+        "qwen2.5-0.5b-instruct": "Qwen/Qwen2.5-0.5B-Instruct",
+        "qwen2.5-1.5b-instruct": "Qwen/Qwen2.5-1.5B-Instruct",
+        "qwen2.5-7b-instruct": "Qwen/Qwen2.5-7B-Instruct",
+        "deepseek-1.3b": "deepseek-ai/deepseek-coder-1.3b-base",
+        "deepseek-6.7b": "deepseek-ai/deepseek-coder-6.7b-base",
+        "codellama-7b": "codellama/CodeLlama-7b-hf",
+        "codellama-34b": "codellama/CodeLlama-34b-hf",
+        "codellama-70b": "codellama/CodeLlama-70b-hf",
+        "llama-2-7b": "meta-llama/Llama-2-7b-hf",
+        "llama-2-70b": "meta-llama/Llama-2-70b-hf",
+    }
     
     args.vocab_size = vocab_size.get(args.draft_model, 32000)
-    args.draft_model_path = zoo.get(args.draft_model, args.draft_model)
-    args.target_model_path = zoo.get(args.target_model, args.target_model)
+    
+    def resolve_model_path(model_name):
+        local_path = local_zoo.get(model_name)
+        if local_path and os.path.exists(local_path):
+            return local_path
+        return hf_zoo.get(model_name, model_name)
+
+    args.draft_model_path = resolve_model_path(args.draft_model)
+    args.target_model_path = resolve_model_path(args.target_model)
 
 def parse_arguments():
     """Specified arguments for PEARL-WAN."""
     parser = argparse.ArgumentParser(description='PEARL-WAN: Cloud-Edge Collaborative Speculative Decoding')
     
-    parser.add_argument('--data_path', type=str, default="/common/home/hd535/pearl_wan/data")
+    parser.add_argument('--data_path', type=str, default=os.environ.get("PEARL_WAN_DATA_DIR", os.path.join(os.getcwd(), "data")))
     parser.add_argument('--draft_model', type=str, default="qwen2.5-0.5b-instruct")
     parser.add_argument('--target_model', type=str, default="qwen2.5-1.5b-instruct")
     
