@@ -98,7 +98,7 @@ class TransmissionCompressor:
         if compressed_data["type"] == "topk_quantized":
             # Reconstruct full logits with top-k values, rest as -inf
             top_k_vals = compressed_data["top_k_vals"].to(device)
-            top_k_indices = compressed_data["top_k_indices"].to(device)
+            top_k_indices = compressed_data["top_k_indices"].to(device).long()
             
             logits = torch.full((batch_size, seq_len, vocab), float('-inf'), 
                                dtype=top_k_vals.dtype, device=device)
