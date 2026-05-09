@@ -1,0 +1,35 @@
+services:
+  pearl-wan:
+    build:
+      context: .
+    image: pearl-wan:latest
+    working_dir: /workspace/pearl_wan
+    volumes:
+      - /home/b/models/pearl-wan:/workspace/models
+      - /home/b/models/huggingface:/workspace/.cache/huggingface
+      - ./data:/workspace/pearl_wan/data
+      - ./exp:/workspace/pearl_wan/exp
+    environment:
+      HF_ENDPOINT: https://hf-mirror.com
+      HF_HOME: /workspace/.cache/huggingface
+      PEARL_WAN_MODEL_DIR: /workspace/models
+      PEARL_WAN_DATA_DIR: /workspace/pearl_wan/data
+      CUDA_VISIBLE_DEVICES: "0"
+    gpus:
+      - driver: nvidia
+        device_ids:
+          - "1"
+        capabilities:
+          - gpu
+    command:
+      - --num_samples
+      - "1"
+      - --max_tokens
+      - "32"
+      - --rtt_ms
+      - "50"
+      - --bandwidth_mbps
+      - "100"
+      - --enable_adaptive_window
+      - --enable_compression
+      - --enable_fallback
