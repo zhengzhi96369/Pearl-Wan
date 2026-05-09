@@ -1,0 +1,14 @@
+.git
+__pycache__/
+*.pyc
+*.pyo
+*.log
+exp/
+models/
+data/*.jsonl
+figures/
+*.docx
+*.pdf
+.venv/
+venv/
+.cache/
