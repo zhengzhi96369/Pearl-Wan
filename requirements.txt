@@ -1,0 +1,10 @@
+transformers>=4.45,<5
+huggingface_hub[cli]>=0.34
+accelerate>=0.34
+sentencepiece>=0.2
+protobuf>=4.25
+numpy>=1.24
+matplotlib>=3.7
+tqdm>=4.66
+datasets>=2.20
+modelscope>=1.20
