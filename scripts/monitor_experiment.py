@@ -286,9 +286,15 @@ def render_html(snapshot: Dict) -> str:
     .footer {{ height: 58px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 0 34px; border-top: 1px solid #d0d0d0; background: #ededed; }}
     button {{ min-width: 90px; height: 30px; border: 1px solid #9aa4aa; background: #fafafa; color: #777; }}
     .tabs {{ display: flex; gap: 4px; margin-bottom: 0; }}
-    .tab {{ padding: 9px 16px; border: 1px solid #b8c0c6; border-bottom: 0; background: #e7e9eb; font-size: 13px; }}
-    .tab.active {{ background: white; font-weight: 600; }}
+    .tab {{
+      padding: 9px 16px; border: 1px solid #b8c0c6; border-bottom: 0;
+      background: #e7e9eb; font-size: 13px; color: #202020; cursor: pointer;
+      min-width: auto; height: auto;
+    }}
+    .tab.active {{ background: white; font-weight: 600; position: relative; top: 1px; }}
     .tab-body {{ border: 1px solid #b8c0c6; background: white; padding: 14px; margin-bottom: 18px; }}
+    .tab-panel {{ display: none; }}
+    .tab-panel.active {{ display: block; }}
     .analysis-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }}
     ul {{ margin: 8px 0 0 18px; padding: 0; }}
   </style>
@@ -308,11 +314,11 @@ def render_html(snapshot: Dict) -> str:
       <div><b>{html.escape(phase)}</b></div>
       <div class="progress-shell"><div class="progress-fill"></div></div>
       <div class="status-line"><span>{results} result files completed from {total or "?"} planned strict experiments</span><span>{progress_pct:.1f}%</span></div>
-      <div class="tabs">
-        <div class="tab active">Status</div>
-        <div class="tab">Live Analysis</div>
+      <div class="tabs" role="tablist">
+        <button class="tab active" type="button" role="tab" data-tab="status">Status</button>
+        <button class="tab" type="button" role="tab" data-tab="analysis">Live Analysis</button>
       </div>
-      <div class="tab-body">
+      <div id="tab-status" class="tab-body tab-panel active" role="tabpanel">
         <div class="steps">
           <div class="step"><b>{current}</b><span>Current experiment</span></div>
           <div class="step"><b>{results}</b><span>Result JSON files</span></div>
@@ -320,7 +326,7 @@ def render_html(snapshot: Dict) -> str:
           <div class="step"><b>{"Alive" if snapshot["pid"]["alive"] else "Stopped"}</b><span>Driver status</span></div>
         </div>
       </div>
-      <div class="tab-body">
+      <div id="tab-analysis" class="tab-body tab-panel" role="tabpanel">
         <h2>Live Analysis Agent</h2>
         <p class="muted">{analysis_summary}</p>
         <div class="analysis-grid">
@@ -341,6 +347,22 @@ def render_html(snapshot: Dict) -> str:
     </div>
     <div class="footer"><button disabled>Back</button><button disabled>Next</button><button disabled>Cancel</button></div>
   </main>
+  <script>
+    const savedTab = localStorage.getItem("pearl-wan-monitor-tab") || "status";
+    function selectTab(name) {{
+      document.querySelectorAll(".tab").forEach((tab) => {{
+        tab.classList.toggle("active", tab.dataset.tab === name);
+      }});
+      document.querySelectorAll(".tab-panel").forEach((panel) => {{
+        panel.classList.toggle("active", panel.id === "tab-" + name);
+      }});
+      localStorage.setItem("pearl-wan-monitor-tab", name);
+    }}
+    document.querySelectorAll(".tab").forEach((tab) => {{
+      tab.addEventListener("click", () => selectTab(tab.dataset.tab));
+    }});
+    selectTab(savedTab);
+  </script>
 </body>
 </html>"""
 
