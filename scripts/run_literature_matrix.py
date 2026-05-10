@@ -84,7 +84,7 @@ def sweep_cases(config: Dict, profile_name: str) -> Iterable[Dict]:
         yield {**base, "compression_top_k": top_k, "sweep": f"topk{top_k}"}
 
 
-def strict_commands(config: Dict, profile_name: str, run_id: str) -> Iterable[List[str]]:
+def strict_commands(config: Dict, profile_name: str, run_id: str) -> Iterable[Dict]:
     profile = config["profiles"][profile_name]
     tasks = profile.get("tasks") or profile.get("strict_tasks") or ["speed"]
     limit = int(profile.get("limit", 20))
@@ -143,10 +143,17 @@ def strict_commands(config: Dict, profile_name: str, run_id: str) -> Iterable[Li
                     cmd.extend(["--num_samples", str(max(1, min(4, limit)))])
                 else:
                     cmd.extend(["--limit", str(limit)])
-                yield cmd
+                yield {
+                    "cmd": cmd,
+                    "pair": pair_key(pair),
+                    "family": pair.get("family", ""),
+                    "compatibility": pair.get("compatibility", ""),
+                    "task": task,
+                    "sweep": case["sweep"],
+                }
 
 
-def serving_commands(config: Dict, profile_name: str, run_id: str) -> Iterable[List[str]]:
+def serving_commands(config: Dict, profile_name: str, run_id: str) -> Iterable[Dict]:
     if profile_name == "tiny":
         return
     profile = config["profiles"][profile_name]
@@ -163,7 +170,7 @@ def serving_commands(config: Dict, profile_name: str, run_id: str) -> Iterable[L
             for concurrency in variables["concurrency"]:
                 exp_id = next(exp_counter)
                 exp_name = f"{run_id}/serving_{exp_id:04d}_{model['name']}_{task}_c{concurrency}"
-                yield [
+                cmd = [
                     sys.executable,
                     "benchmark/eval_vllm_serving.py",
                     "--model",
@@ -181,6 +188,7 @@ def serving_commands(config: Dict, profile_name: str, run_id: str) -> Iterable[L
                     "--exp_name",
                     exp_name,
                 ]
+                yield {"cmd": cmd, "pair": model["name"], "family": "serving", "compatibility": model.get("quantization", ""), "task": task, "sweep": f"c{concurrency}"}
 
 
 def run_command(cmd: List[str], log_path: str, dry_run: bool) -> Dict:
@@ -196,13 +204,37 @@ def run_command(cmd: List[str], log_path: str, dry_run: bool) -> Dict:
     return row
 
 
+def classify_failure(log_path: str) -> str:
+    try:
+        text = open(log_path, "r", encoding="utf-8", errors="replace").read()
+    except OSError:
+        return "unknown"
+    needles = [
+        ("CUDA out of memory", "oom"),
+        ("OutOfMemoryError", "oom"),
+        ("Repository Not Found", "download_or_auth"),
+        ("401 Client Error", "download_or_auth"),
+        ("does not appear to have a file named", "missing_model_file"),
+        ("size of tensor", "shape_or_tokenizer_mismatch"),
+        ("indices should be either", "device_or_indexing"),
+        ("Expected all tensors to be on the same device", "device_or_indexing"),
+    ]
+    for needle, label in needles:
+        if needle in text:
+            return label
+    if "Traceback" in text or "RuntimeError" in text:
+        return "runtime_error"
+    return "failed"
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--profile", default="tiny", choices=["tiny", "paper"])
+    parser.add_argument("--profile", default="tiny", choices=["tiny", "paper", "single5090"])
     parser.add_argument("--run-id", default=time.strftime("literature_%Y%m%d-%H%M%S"))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--include-serving", action="store_true")
     parser.add_argument("--max-experiments", type=int, default=0)
+    parser.add_argument("--auto-adjust", action="store_true", help="Skip remaining commands for a model pair after OOM/auth/tokenizer/device failures.")
     args = parser.parse_args()
 
     config = load_config()
@@ -222,12 +254,37 @@ def main():
         "num_experiments": len(commands),
         "references": config["references"],
         "commands": [],
+        "skipped": [],
     }
     manifest_path = os.path.join(archive_dir, "manifest.json")
-    for i, cmd in enumerate(commands, 1):
+    disabled_pairs = {}
+    for i, item in enumerate(commands, 1):
+        cmd = item["cmd"]
         log_path = os.path.join(archive_dir, "logs", f"experiment_{i:04d}.log")
+        pair = item.get("pair", "")
+        if args.auto_adjust and pair in disabled_pairs:
+            row = {
+                **item,
+                "log_path": log_path,
+                "status": "skipped",
+                "returncode": 0,
+                "failure_class": disabled_pairs[pair],
+                "started_at": time.time(),
+                "ended_at": time.time(),
+            }
+            print(f"[{i}/{len(commands)}] SKIP {pair}: {disabled_pairs[pair]}")
+            manifest["skipped"].append(row)
+            manifest["commands"].append(row)
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                json.dump(manifest, f, ensure_ascii=False, indent=2)
+            continue
         print(f"[{i}/{len(commands)}] {' '.join(cmd)}")
-        manifest["commands"].append(run_command(cmd, log_path, args.dry_run))
+        row = {**item, **run_command(cmd, log_path, args.dry_run)}
+        if row["status"] == "failed":
+            row["failure_class"] = classify_failure(log_path)
+            if args.auto_adjust and row["failure_class"] in {"oom", "download_or_auth", "missing_model_file", "shape_or_tokenizer_mismatch", "device_or_indexing"}:
+                disabled_pairs[pair] = row["failure_class"]
+        manifest["commands"].append(row)
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
     print(f"Manifest: {manifest_path}")

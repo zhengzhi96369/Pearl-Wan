@@ -15,6 +15,7 @@ docker_run() {
     docker run --rm --gpus "$GPU_DEVICES" \
         -e HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}" \
         -e HF_HOME=/workspace/.cache/huggingface \
+        -e CUDA_VISIBLE_DEVICES="${PEARL_CUDA_VISIBLE_DEVICES:-0}" \
         -e PEARL_WAN_MODEL_DIR=/workspace/models \
         -e PEARL_WAN_DATA_DIR=/workspace/pearl_wan/data \
         -e PEARL_DEVICE_EDGE="${PEARL_DEVICE_EDGE:-cuda}" \
@@ -94,7 +95,11 @@ smoke() {
 
 prepare() {
     docker build -t pearl-wan:latest .
-    docker_run python scripts/prepare_literature_data.py --limit "${PEARL_DATA_LIMIT:-200}"
+    if [ "${PEARL_SKIP_DATA_PREP:-0}" != "1" ]; then
+        docker_run python scripts/prepare_literature_data.py --limit "${PEARL_DATA_LIMIT:-200}"
+    else
+        echo "Skipping data preparation because PEARL_SKIP_DATA_PREP=1"
+    fi
     docker_run bash scripts/prepare_literature_models.sh "${1:-strict-small}" "exp/${RUN_ID}_model_downloads.jsonl"
 }
 
@@ -104,6 +109,9 @@ run_matrix() {
     mkdir -p "$ARCHIVE_DIR"
     docker build -t pearl-wan:latest .
     local args=(python scripts/run_literature_matrix.py --profile "$profile" --run-id "$RUN_ID")
+    if [ "${PEARL_AUTO_ADJUST:-0}" = "1" ]; then
+        args+=(--auto-adjust)
+    fi
     if [ "${PEARL_INCLUDE_SERVING:-0}" = "1" ]; then
         args+=(--include-serving)
     fi
@@ -147,6 +155,35 @@ body = f"""Pearl-Wan 文献驱动扩展实验已完成。
 data = {
     "to": to,
     "subject": "Pearl-Wan 文献驱动扩展实验报告",
+    "body": body,
+    "attachments": attachments,
+}
+with open(payload, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+    print(payload)
+PY
+}
+
+mail_payload() {
+    local payload="$ARCHIVE_DIR/mail_payload.json"
+    "$PYTHON_BIN" - "$ARCHIVE_DIR" "$MAIL_TO" "$payload" <<'PY'
+import json, os, sys
+archive, to, payload = sys.argv[1:]
+analysis = os.path.join(archive, "analysis")
+attachments = [
+    os.path.join(analysis, "EXTENDED_RESULTS.pdf"),
+    os.path.join(analysis, "EXTENDED_RESULTS.html"),
+    os.path.join(analysis, "summary.csv"),
+]
+attachments = [p for p in attachments if os.path.exists(p)]
+body = f"""Pearl-Wan single RTX 5090 auto-adjusted experiment has completed.
+
+Archive directory: {archive}
+
+Attachments include the PDF/HTML report and summary.csv. The report separates strict speculative decoding, WAN protocol simulation, and failed/skipped model configurations so the conclusions keep a consistent experimental scope."""
+data = {
+    "to": to,
+    "subject": "Pearl-Wan single-5090 auto-adjusted experiment report",
     "body": body,
     "attachments": attachments,
 }

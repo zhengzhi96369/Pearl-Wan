@@ -22,7 +22,11 @@ def run_cmd(cmd: List[str], timeout: int = 10) -> str:
 
 def latest_run(root: Path) -> Optional[Path]:
     archives = root / "archives"
-    candidates = sorted(archives.glob("literature_full_*"), key=lambda p: p.stat().st_mtime, reverse=True)
+    patterns = ["single5090_auto_*", "literature_full_*", "literature_*"]
+    candidates = []
+    for pattern in patterns:
+        candidates.extend(archives.glob(pattern))
+    candidates = sorted(set(candidates), key=lambda p: p.stat().st_mtime, reverse=True)
     return candidates[0] if candidates else None
 
 

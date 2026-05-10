@@ -38,7 +38,9 @@ PY
         return 0
     fi
     echo ">>> downloading $repo_id -> $local_dir"
-    if ! HF_ENDPOINT="$HF_ENDPOINT" hf download "$repo_id" --local-dir "$local_dir"; then
+    if ! HF_ENDPOINT="$HF_ENDPOINT" hf download "$repo_id" \
+        --local-dir "$local_dir" \
+        --include "*.json" "*.txt" "*.model" "*.safetensors" "pytorch_model*.bin" "merges.txt" "vocab.json"; then
         status="hf_failed"
         source="modelscope"
         echo ">>> hf download failed for $repo_id; trying ModelScope fallback"
@@ -89,6 +91,18 @@ case "$PROFILE" in
             "Qwen/Qwen2.5-7B-Instruct|qwen2.5-7b-instruct"
             "Qwen/Qwen2.5-Coder-1.5B-Instruct|qwen2.5-coder-1.5b-instruct"
             "Qwen/Qwen2.5-Coder-7B-Instruct|qwen2.5-coder-7b-instruct"
+        )
+        ;;
+    single5090)
+        MODELS=(
+            "Qwen/Qwen2.5-0.5B-Instruct|qwen2.5-0.5b-instruct"
+            "Qwen/Qwen2.5-1.5B-Instruct|qwen2.5-1.5b-instruct"
+            "Qwen/Qwen2.5-7B-Instruct|qwen2.5-7b-instruct"
+            "Qwen/Qwen2.5-Coder-1.5B-Instruct|qwen2.5-coder-1.5b-instruct"
+            "Qwen/Qwen2.5-Coder-7B-Instruct|qwen2.5-coder-7b-instruct"
+            "facebook/opt-125m|opt-125m"
+            "facebook/opt-1.3b|opt-1.3b"
+            "facebook/opt-6.7b|opt-6.7b"
         )
         ;;
     serving-paper)
