@@ -61,7 +61,7 @@
       "limit": 1
     },
     "paper": {
-      "strict_pair_tiers": ["small", "medium", "ratio", "code", "llama"],
+      "strict_pair_tiers": ["small", "medium", "ratio", "code"],
       "strict_tasks": ["humaneval", "gsm8k", "mgsm", "speed"],
       "serving_models": ["qwen2.5-coder-14b-instruct-awq", "qwen2.5-32b-instruct", "qwen2.5-72b-instruct", "qwen3-30b-a3b", "mixtral-8x7b", "llama-3.1-70b"],
       "serving_tasks": ["mtbench", "humaneval", "gsm8k", "math500", "speed"],

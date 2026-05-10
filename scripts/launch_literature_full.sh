@@ -15,8 +15,9 @@ cd "$ROOT"
 export PEARL_RUN_ID="$RUN_ID"
 export PEARL_INCLUDE_SERVING=0
 bash scripts/pearl_lab.sh preempt
-bash scripts/pearl_lab.sh prepare all
+bash scripts/pearl_lab.sh prepare strict-paper
 bash scripts/pearl_lab.sh run paper
+bash scripts/pearl_lab.sh prepare serving-paper
 bash scripts/pearl_lab.sh serving
 bash scripts/pearl_lab.sh analyze
 bash scripts/pearl_lab.sh mail-payload
