@@ -135,6 +135,32 @@ def model_download_manifest(root: Path, run_id: str) -> List[Dict]:
     return rows
 
 
+def live_analysis(run_dir: Path) -> Dict:
+    path = run_dir / "analysis_agent" / "live_analysis.json"
+    if not path.exists():
+        return {
+            "available": False,
+            "summary": "Live analysis agent has not produced a snapshot yet.",
+            "bullets": [],
+            "mode_speeds": {},
+            "recent": [],
+            "errors": [],
+        }
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["available"] = True
+        return data
+    except Exception as exc:
+        return {
+            "available": False,
+            "summary": f"Could not read live analysis: {exc}",
+            "bullets": [],
+            "mode_speeds": {},
+            "recent": [],
+            "errors": [],
+        }
+
+
 def build_snapshot(root: Path, run_dir: Path) -> Dict:
     run_id = run_dir.name
     exp_dir = root / "exp" / run_id
@@ -155,6 +181,7 @@ def build_snapshot(root: Path, run_dir: Path) -> Dict:
         "gpu": gpu_status(),
         "docker": docker_status(),
         "model_downloads": model_download_manifest(root, run_id),
+        "analysis": live_analysis(run_dir),
     }
     return snapshot
 
@@ -170,6 +197,7 @@ def render_html(snapshot: Dict) -> str:
     total = snapshot["driver"]["total_experiments"]
     results = snapshot["counts"]["result_json_count"]
     failed = snapshot["counts"]["log_error_count"]
+    analysis = snapshot["analysis"]
     phase = "Running strict SD matrix" if total else "Preparing experiment queue"
     if not snapshot["pid"]["alive"]:
         phase = "Driver stopped"
@@ -186,6 +214,20 @@ def render_html(snapshot: Dict) -> str:
         f"<tr><td>{m.get('local_name')}</td><td>{m.get('status')}</td><td>{m.get('source')}</td><td>{int(m.get('bytes', 0)) / 1e9:.2f} GB</td></tr>"
         for m in snapshot["model_downloads"][-20:]
     )
+    mode_rows = "\n".join(
+        f"<tr><td>{html.escape(str(mode))}</td><td>{float(speed):.2f} tok/s</td></tr>"
+        for mode, speed in analysis.get("mode_speeds", {}).items()
+    )
+    bullets = "\n".join(f"<li>{html.escape(str(item))}</li>" for item in analysis.get("bullets", []))
+    recent_rows = "\n".join(
+        f"<tr><td>{html.escape(str(row.get('name', '')))}</td><td>{html.escape(str(row.get('task', '')))}</td><td>{html.escape(str(row.get('wan_speed', '')))}</td></tr>"
+        for row in analysis.get("recent", [])[-12:]
+    )
+    error_rows = "\n".join(
+        f"<tr><td>{html.escape(str(row.get('log', '')))}</td><td>{html.escape(str(row.get('message', '')))}</td></tr>"
+        for row in analysis.get("errors", [])[-8:]
+    )
+    analysis_summary = html.escape(str(analysis.get("summary", "No analysis yet.")))
     return f"""<!doctype html>
 <html>
 <head>
@@ -243,6 +285,12 @@ def render_html(snapshot: Dict) -> str:
     pre {{ margin: 0; white-space: pre-wrap; max-height: 210px; overflow: auto; background: #111820; color: #e8edf2; padding: 10px; font-size: 12px; }}
     .footer {{ height: 58px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 0 34px; border-top: 1px solid #d0d0d0; background: #ededed; }}
     button {{ min-width: 90px; height: 30px; border: 1px solid #9aa4aa; background: #fafafa; color: #777; }}
+    .tabs {{ display: flex; gap: 4px; margin-bottom: 0; }}
+    .tab {{ padding: 9px 16px; border: 1px solid #b8c0c6; border-bottom: 0; background: #e7e9eb; font-size: 13px; }}
+    .tab.active {{ background: white; font-weight: 600; }}
+    .tab-body {{ border: 1px solid #b8c0c6; background: white; padding: 14px; margin-bottom: 18px; }}
+    .analysis-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }}
+    ul {{ margin: 8px 0 0 18px; padding: 0; }}
   </style>
 </head>
 <body>
@@ -260,11 +308,27 @@ def render_html(snapshot: Dict) -> str:
       <div><b>{html.escape(phase)}</b></div>
       <div class="progress-shell"><div class="progress-fill"></div></div>
       <div class="status-line"><span>{results} result files completed from {total or "?"} planned strict experiments</span><span>{progress_pct:.1f}%</span></div>
-      <div class="steps">
-        <div class="step"><b>{current}</b><span>Current experiment</span></div>
-        <div class="step"><b>{results}</b><span>Result JSON files</span></div>
-        <div class="step"><b>{failed}</b><span>Logged errors</span></div>
-        <div class="step"><b>{"Alive" if snapshot["pid"]["alive"] else "Stopped"}</b><span>Driver status</span></div>
+      <div class="tabs">
+        <div class="tab active">Status</div>
+        <div class="tab">Live Analysis</div>
+      </div>
+      <div class="tab-body">
+        <div class="steps">
+          <div class="step"><b>{current}</b><span>Current experiment</span></div>
+          <div class="step"><b>{results}</b><span>Result JSON files</span></div>
+          <div class="step"><b>{failed}</b><span>Logged errors</span></div>
+          <div class="step"><b>{"Alive" if snapshot["pid"]["alive"] else "Stopped"}</b><span>Driver status</span></div>
+        </div>
+      </div>
+      <div class="tab-body">
+        <h2>Live Analysis Agent</h2>
+        <p class="muted">{analysis_summary}</p>
+        <div class="analysis-grid">
+          <section><h2>Early Findings</h2><ul>{bullets or "<li>Waiting for more completed results.</li>"}</ul></section>
+          <section><h2>Average Speeds</h2><table><tr><th>Mode</th><th>Average</th></tr>{mode_rows}</table></section>
+          <section><h2>Recent Results</h2><table><tr><th>Experiment</th><th>Task</th><th>WAN speed</th></tr>{recent_rows}</table></section>
+          <section><h2>Error Signals</h2><table><tr><th>Log</th><th>Message</th></tr>{error_rows}</table></section>
+        </div>
       </div>
       <div class="panels">
         <section><h2>Current Command</h2><pre>{current_command}</pre></section>
