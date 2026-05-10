@@ -1,4 +1,5 @@
 import argparse
+import html
 import json
 import os
 import re
@@ -159,6 +160,19 @@ def build_snapshot(root: Path, run_dir: Path) -> Dict:
 
 
 def render_html(snapshot: Dict) -> str:
+    current_command = html.escape(snapshot["driver"]["current_command"])
+    log_tail = html.escape(snapshot["driver"]["tail"])
+    process_text = html.escape(snapshot["pid"]["ps"])
+    run_id = html.escape(snapshot["run_id"])
+    updated = html.escape(snapshot["timestamp"])
+    progress_pct = snapshot["progress_fraction"] * 100
+    current = snapshot["driver"]["current_index"]
+    total = snapshot["driver"]["total_experiments"]
+    results = snapshot["counts"]["result_json_count"]
+    failed = snapshot["counts"]["log_error_count"]
+    phase = "Running strict SD matrix" if total else "Preparing experiment queue"
+    if not snapshot["pid"]["alive"]:
+        phase = "Driver stopped"
     gpu_rows = "\n".join(
         f"<tr><td>{g['index']}</td><td>{g['name']}</td><td>{g['memory_used_mib']}/{g['memory_total_mib']} MiB</td>"
         f"<td>{g['utilization_gpu_pct']}%</td><td>{g['power_w']} W</td><td>{g['temperature_c']} C</td></tr>"
@@ -172,54 +186,97 @@ def render_html(snapshot: Dict) -> str:
         f"<tr><td>{m.get('local_name')}</td><td>{m.get('status')}</td><td>{m.get('source')}</td><td>{int(m.get('bytes', 0)) / 1e9:.2f} GB</td></tr>"
         for m in snapshot["model_downloads"][-20:]
     )
-    progress_pct = snapshot["progress_fraction"] * 100
     return f"""<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="30">
-  <title>Pearl-Wan Monitor - {snapshot['run_id']}</title>
+  <meta http-equiv="refresh" content="10">
+  <title>Pearl-Wan Setup - {run_id}</title>
   <style>
-    body {{ font-family: system-ui, sans-serif; margin: 24px; background: #f7f7f4; color: #202020; }}
-    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }}
-    section {{ background: white; border: 1px solid #ddd; border-radius: 8px; padding: 16px; }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      background: #2f3437; font-family: "Segoe UI", system-ui, sans-serif; color: #202020;
+    }}
+    .window {{
+      width: min(980px, calc(100vw - 32px)); min-height: 680px; background: #f4f4f4;
+      border: 1px solid #1f2427; box-shadow: 0 28px 90px rgba(0,0,0,.45);
+    }}
+    .titlebar {{
+      height: 38px; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 12px; color: #f8f8f8; background: linear-gradient(#3c4246, #272c2f); font-size: 13px;
+    }}
+    .controls span {{
+      display: inline-grid; place-items: center; width: 30px; height: 22px; margin-left: 4px;
+      border: 1px solid rgba(255,255,255,.18); color: #ddd;
+    }}
+    .hero {{
+      display: grid; grid-template-columns: 180px 1fr; min-height: 172px;
+      background: linear-gradient(90deg, #d9e4ee, #fbfbfb); border-bottom: 1px solid #d2d2d2;
+    }}
+    .brand {{
+      display: grid; place-items: center; background: #24445f; color: white;
+      font-size: 54px; font-weight: 700; letter-spacing: 0;
+    }}
+    .intro {{ padding: 28px 34px; }}
+    h1 {{ margin: 0 0 8px; font-size: 24px; font-weight: 600; }}
+    .muted {{ color: #60686e; font-size: 13px; }}
+    .content {{ padding: 26px 34px 18px; }}
+    .progress-shell {{
+      width: 100%; height: 28px; padding: 3px; border: 1px solid #8d969c;
+      background: #ffffff; box-shadow: inset 0 1px 2px rgba(0,0,0,.18); margin: 12px 0 8px;
+    }}
+    .progress-fill {{
+      height: 100%; width: {progress_pct:.2f}%; min-width: 2px;
+      background: repeating-linear-gradient(45deg, #2e8b57 0, #2e8b57 14px, #37a46a 14px, #37a46a 28px);
+      transition: width .4s ease;
+    }}
+    .status-line {{ display: flex; justify-content: space-between; gap: 16px; font-size: 13px; color: #30383d; margin-bottom: 22px; }}
+    .steps {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }}
+    .step {{ border: 1px solid #c8ced3; background: white; padding: 10px; min-height: 74px; }}
+    .step b {{ display: block; font-size: 18px; margin-bottom: 4px; }}
+    .panels {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }}
+    section {{ background: white; border: 1px solid #c8ced3; padding: 12px; min-height: 150px; }}
+    h2 {{ margin: 0 0 10px; font-size: 14px; font-weight: 600; }}
     table {{ width: 100%; border-collapse: collapse; }}
-    td, th {{ border-bottom: 1px solid #eee; padding: 6px; text-align: left; font-size: 13px; }}
-    pre {{ white-space: pre-wrap; max-height: 520px; overflow: auto; background: #111; color: #eee; padding: 12px; border-radius: 6px; }}
-    progress {{ width: 100%; height: 18px; }}
-    code {{ font-size: 12px; }}
+    td, th {{ border-bottom: 1px solid #eceff1; padding: 6px; text-align: left; font-size: 12px; }}
+    pre {{ margin: 0; white-space: pre-wrap; max-height: 210px; overflow: auto; background: #111820; color: #e8edf2; padding: 10px; font-size: 12px; }}
+    .footer {{ height: 58px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 0 34px; border-top: 1px solid #d0d0d0; background: #ededed; }}
+    button {{ min-width: 90px; height: 30px; border: 1px solid #9aa4aa; background: #fafafa; color: #777; }}
   </style>
 </head>
 <body>
-  <h1>Pearl-Wan Experiment Monitor</h1>
-  <p><b>Run:</b> {snapshot['run_id']} | <b>Updated:</b> {snapshot['timestamp']}</p>
-  <progress max="100" value="{progress_pct:.2f}"></progress>
-  <p>{snapshot['counts']['result_json_count']} result JSON / {snapshot['driver']['total_experiments'] or '?'} planned strict experiments</p>
-  <div class="grid">
-    <section>
-      <h2>Process</h2>
-      <pre>{snapshot['pid']['ps']}</pre>
-    </section>
-    <section>
-      <h2>Current Experiment</h2>
-      <p><b>{snapshot['driver']['current_index']}/{snapshot['driver']['total_experiments']}</b></p>
-      <pre>{snapshot['driver']['current_command']}</pre>
-    </section>
-    <section>
-      <h2>GPU</h2>
-      <table><tr><th>ID</th><th>Name</th><th>Memory</th><th>Util</th><th>Power</th><th>Temp</th></tr>{gpu_rows}</table>
-    </section>
-    <section>
-      <h2>Docker</h2>
-      <table><tr><th>Name</th><th>Status</th><th>Image</th><th>Command</th></tr>{docker_rows}</table>
-    </section>
-    <section>
-      <h2>Model Downloads</h2>
-      <table><tr><th>Model</th><th>Status</th><th>Source</th><th>Size</th></tr>{downloads}</table>
-    </section>
-  </div>
-  <h2>Driver Log Tail</h2>
-  <pre>{snapshot['driver']['tail']}</pre>
+  <main class="window">
+    <div class="titlebar"><div>Pearl-Wan Experiment Setup</div><div class="controls"><span>-</span><span>□</span><span>×</span></div></div>
+    <div class="hero">
+      <div class="brand">PW</div>
+      <div class="intro">
+        <h1>Running literature-driven WAN experiments</h1>
+        <div class="muted">Run: {run_id}</div>
+        <div class="muted">Last update: {updated}</div>
+      </div>
+    </div>
+    <div class="content">
+      <div><b>{html.escape(phase)}</b></div>
+      <div class="progress-shell"><div class="progress-fill"></div></div>
+      <div class="status-line"><span>{results} result files completed from {total or "?"} planned strict experiments</span><span>{progress_pct:.1f}%</span></div>
+      <div class="steps">
+        <div class="step"><b>{current}</b><span>Current experiment</span></div>
+        <div class="step"><b>{results}</b><span>Result JSON files</span></div>
+        <div class="step"><b>{failed}</b><span>Logged errors</span></div>
+        <div class="step"><b>{"Alive" if snapshot["pid"]["alive"] else "Stopped"}</b><span>Driver status</span></div>
+      </div>
+      <div class="panels">
+        <section><h2>Current Command</h2><pre>{current_command}</pre></section>
+        <section><h2>Process</h2><pre>{process_text}</pre></section>
+        <section><h2>GPU</h2><table><tr><th>ID</th><th>Name</th><th>Memory</th><th>Util</th><th>Power</th><th>Temp</th></tr>{gpu_rows}</table></section>
+        <section><h2>Docker</h2><table><tr><th>Name</th><th>Status</th><th>Image</th><th>Command</th></tr>{docker_rows}</table></section>
+        <section><h2>Model Downloads</h2><table><tr><th>Model</th><th>Status</th><th>Source</th><th>Size</th></tr>{downloads}</table></section>
+        <section><h2>Driver Log Tail</h2><pre>{log_tail}</pre></section>
+      </div>
+    </div>
+    <div class="footer"><button disabled>Back</button><button disabled>Next</button><button disabled>Cancel</button></div>
+  </main>
 </body>
 </html>"""
 
