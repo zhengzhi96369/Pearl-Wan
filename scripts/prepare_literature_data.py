@@ -70,6 +70,9 @@ def try_dataset(name: str, limit: int) -> List[dict]:
         return FALLBACK_ROWS[name][:limit]
     dataset_name, subset, split = recipes[name]
     try:
+        if name in {"cnn_dailymail", "natural_questions"}:
+            ds = load_dataset(dataset_name, subset, split=split, streaming=True) if subset else load_dataset(dataset_name, split=split, streaming=True)
+            return [dict(row) for _, row in zip(range(limit), ds)]
         ds = load_dataset(dataset_name, subset, split=split) if subset else load_dataset(dataset_name, split=split)
         return [dict(row) for row in ds.select(range(min(limit, len(ds))))]
     except Exception:
