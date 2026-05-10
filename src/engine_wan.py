@@ -306,7 +306,7 @@ class PEARLWANEngine:
             # --- PEARL Verification Logic ---
             if cur_mode:
                 # Pre-verify: check first draft token
-                first_token = recv_ids[:, 0].to(draft_device)
+                first_token = recv_ids[:, 0].to(target_device)
                 torch.manual_seed(self.args.seed + prefix_len)
                 r = torch.rand(1, device=draft_device)
                 
@@ -334,7 +334,7 @@ class PEARLWANEngine:
                 # Post-verify: verify all gamma tokens
                 n = gamma
                 for i in range(gamma):
-                    token = recv_ids[:, i].to(draft_device)
+                    token = recv_ids[:, i].to(target_device)
                     torch.manual_seed(self.args.seed + prefix_len - gamma + i)
                     r = torch.rand(1, device=draft_device)
                     
