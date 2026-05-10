@@ -5,6 +5,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from .kvcache_wan import KVCacheModelWAN
 from .util_wan import seed_everything, norm_logits, sample, max_fn, simulate_network_delay
 from .network_simulator import NetworkSimulator
+from .research_network_simulator import ResearchNetworkSimulator
 from .compression import TransmissionCompressor
 from .adaptive_window import AdaptiveWindowSelector
 from .fallback import FallbackManager
@@ -34,16 +35,31 @@ class PEARLWANEngine:
         self.transmission_bytes = []
         
         # Components
-        self.network = NetworkSimulator(
-            rtt_ms=args.rtt_ms,
-            bandwidth_mbps=args.bandwidth_mbps,
-            packet_loss_rate=args.packet_loss_rate,
-        )
+        if args.network_simulator == "research":
+            self.network = ResearchNetworkSimulator(
+                rtt_ms=args.rtt_ms,
+                bandwidth_mbps=args.bandwidth_mbps,
+                packet_loss_rate=args.packet_loss_rate,
+                jitter_ms=args.jitter_ms,
+                mtu_bytes=args.mtu_bytes,
+                reorder_rate=args.reorder_rate,
+                timeout_ms=args.timeout_ms,
+                max_retries=args.max_retries,
+                loss_model=args.loss_model,
+                jitter_model=args.jitter_model,
+            )
+        else:
+            self.network = NetworkSimulator(
+                rtt_ms=args.rtt_ms,
+                bandwidth_mbps=args.bandwidth_mbps,
+                packet_loss_rate=args.packet_loss_rate,
+                jitter_ms=args.jitter_ms,
+            )
         self.compressor = TransmissionCompressor(
             vocab_size=args.vocab_size,
             enable=args.enable_compression,
             quantize_bits=8,
-            top_k_logits=50,
+            top_k_logits=args.compression_top_k,
         )
         self.adaptive_window = AdaptiveWindowSelector(
             initial_gamma=args.gamma,

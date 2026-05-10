@@ -8,3 +8,5 @@ matplotlib>=3.7
 tqdm>=4.66
 datasets>=2.20
 modelscope>=1.20
+requests>=2.32
+reportlab>=4.2

@@ -1,0 +1,71 @@
+{
+  "references": [
+    {
+      "name": "Speculative Decoding",
+      "url": "https://arxiv.org/abs/2211.17192",
+      "experiment_focus": ["draft_target_scale", "speedup", "acceptance_rate"]
+    },
+    {
+      "name": "PEARL",
+      "url": "https://arxiv.org/abs/2408.11850",
+      "experiment_focus": ["adaptive_draft_length", "gamma_sweep", "ablation"]
+    },
+    {
+      "name": "SpecInfer",
+      "url": "https://arxiv.org/abs/2305.09781",
+      "experiment_focus": ["serving_throughput", "concurrency", "latency"]
+    },
+    {
+      "name": "SpecDecode-Bench",
+      "url": "https://specdecode-bench.github.io/",
+      "experiment_focus": ["multi_task", "batch_size", "output_length"]
+    }
+  ],
+  "strict_sd_pairs": [
+    {"family": "qwen", "draft": "qwen2.5-0.5b-instruct", "target": "qwen2.5-1.5b-instruct", "tier": "small"},
+    {"family": "qwen", "draft": "qwen2.5-1.5b-instruct", "target": "qwen2.5-7b-instruct", "tier": "medium"},
+    {"family": "qwen", "draft": "qwen2.5-0.5b-instruct", "target": "qwen2.5-7b-instruct", "tier": "ratio"},
+    {"family": "coder", "draft": "qwen2.5-coder-1.5b-instruct", "target": "qwen2.5-coder-7b-instruct", "tier": "code"},
+    {"family": "llama", "draft": "llama-3.2-1b", "target": "llama-3.1-8b", "tier": "llama"}
+  ],
+  "serving_cloud_models": [
+    {"name": "qwen2.5-coder-14b-instruct-awq", "repo_id": "Qwen/Qwen2.5-Coder-14B-Instruct-AWQ", "quantization": "awq", "tasks": ["humaneval", "mbpp", "speed"]},
+    {"name": "qwen2.5-32b-instruct", "repo_id": "Qwen/Qwen2.5-32B-Instruct", "quantization": "bf16", "tasks": ["gsm8k", "math500", "speed"]},
+    {"name": "qwen2.5-72b-instruct", "repo_id": "Qwen/Qwen2.5-72B-Instruct", "quantization": "bf16_or_awq", "tasks": ["mtbench", "gsm8k", "speed"]},
+    {"name": "qwen3-30b-a3b", "repo_id": "Qwen/Qwen3-30B-A3B", "quantization": "bf16_or_fp8", "tasks": ["mtbench", "gsm8k", "speed"]},
+    {"name": "mixtral-8x7b", "repo_id": "mistralai/Mixtral-8x7B-Instruct-v0.1", "quantization": "bf16_or_awq", "tasks": ["mtbench", "speed"]},
+    {"name": "llama-3.1-70b", "repo_id": "meta-llama/Llama-3.1-70B-Instruct", "quantization": "bf16_or_awq", "tasks": ["mtbench", "speed"]}
+  ],
+  "datasets": {
+    "strict": ["humaneval", "gsm8k", "mgsm"],
+    "extended": ["mtbench", "alpacaeval", "sharegpt", "mbpp", "instructcoder", "math500", "aime", "cnn_dailymail", "natural_questions"]
+  },
+  "variables": {
+    "gamma": [1, 2, 3, 4, 5, 6, 8, 12, 16],
+    "rtt_ms": [0, 10, 20, 50, 100, 200, 300],
+    "bandwidth_mbps": [5, 10, 50, 100, 1000],
+    "packet_loss_rate": [0.0, 0.005, 0.01, 0.03, 0.05],
+    "max_tokens": [32, 64, 128, 256, 512],
+    "concurrency": [1, 2, 4, 8, 16, 32],
+    "compression_top_k": [10, 50, 200]
+  },
+  "profiles": {
+    "tiny": {
+      "strict_pairs": ["qwen2.5-0.5b-instruct->qwen2.5-1.5b-instruct"],
+      "tasks": ["speed"],
+      "gamma": [4],
+      "rtt_ms": [20],
+      "bandwidth_mbps": [100],
+      "packet_loss_rate": [0.0],
+      "max_tokens": [8],
+      "limit": 1
+    },
+    "paper": {
+      "strict_pair_tiers": ["small", "medium", "ratio", "code", "llama"],
+      "strict_tasks": ["humaneval", "gsm8k", "mgsm", "speed"],
+      "serving_models": ["qwen2.5-coder-14b-instruct-awq", "qwen2.5-32b-instruct", "qwen2.5-72b-instruct", "qwen3-30b-a3b", "mixtral-8x7b", "llama-3.1-70b"],
+      "serving_tasks": ["mtbench", "humaneval", "gsm8k", "math500", "speed"],
+      "limit": 20
+    }
+  }
+}

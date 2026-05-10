@@ -29,6 +29,20 @@ def model_zoo(args):
         "qwen2.5-1.5b-instruct": 151936,
         "qwen2.5-7b": 152064,
         "qwen2.5-7b-instruct": 152064,
+        "qwen2.5-14b-instruct": 152064,
+        "qwen2.5-32b-instruct": 152064,
+        "qwen2.5-72b-instruct": 152064,
+        "qwen2.5-coder-1.5b-instruct": 151936,
+        "qwen2.5-coder-7b-instruct": 152064,
+        "qwen2.5-coder-14b-instruct-awq": 152064,
+        "qwen2.5-coder-32b-instruct": 152064,
+        "qwen3-8b": 151936,
+        "qwen3-30b-a3b": 151936,
+        "llama-3.2-1b": 128256,
+        "llama-3.2-3b": 128256,
+        "llama-3.1-8b": 128256,
+        "llama-3.1-70b": 128256,
+        "mixtral-8x7b": 32000,
         "deepseek-1.3b": 32256,
         "deepseek-6.7b": 32256,
         "deepseek-33b": 32256,
@@ -45,6 +59,20 @@ def model_zoo(args):
         "qwen2.5-0.5b-instruct": f"{base_dir}/qwen2.5-0.5b-instruct",
         "qwen2.5-1.5b-instruct": f"{base_dir}/qwen2.5-1.5b-instruct",
         "qwen2.5-7b-instruct": f"{base_dir}/qwen2.5-7b-instruct",
+        "qwen2.5-14b-instruct": f"{base_dir}/qwen2.5-14b-instruct",
+        "qwen2.5-32b-instruct": f"{base_dir}/qwen2.5-32b-instruct",
+        "qwen2.5-72b-instruct": f"{base_dir}/qwen2.5-72b-instruct",
+        "qwen2.5-coder-1.5b-instruct": f"{base_dir}/qwen2.5-coder-1.5b-instruct",
+        "qwen2.5-coder-7b-instruct": f"{base_dir}/qwen2.5-coder-7b-instruct",
+        "qwen2.5-coder-14b-instruct-awq": f"{base_dir}/qwen2.5-coder-14b-instruct-awq",
+        "qwen2.5-coder-32b-instruct": f"{base_dir}/qwen2.5-coder-32b-instruct",
+        "qwen3-8b": f"{base_dir}/qwen3-8b",
+        "qwen3-30b-a3b": f"{base_dir}/qwen3-30b-a3b",
+        "llama-3.2-1b": f"{base_dir}/llama-3.2-1b",
+        "llama-3.2-3b": f"{base_dir}/llama-3.2-3b",
+        "llama-3.1-8b": f"{base_dir}/llama-3.1-8b",
+        "llama-3.1-70b": f"{base_dir}/llama-3.1-70b",
+        "mixtral-8x7b": f"{base_dir}/mixtral-8x7b",
         "deepseek-1.3b": f"{base_dir}/deepseek-coder-1.3b-base",
         "deepseek-6.7b": f"{base_dir}/deepseek-coder-6.7b-base",
     }
@@ -52,6 +80,20 @@ def model_zoo(args):
         "qwen2.5-0.5b-instruct": "Qwen/Qwen2.5-0.5B-Instruct",
         "qwen2.5-1.5b-instruct": "Qwen/Qwen2.5-1.5B-Instruct",
         "qwen2.5-7b-instruct": "Qwen/Qwen2.5-7B-Instruct",
+        "qwen2.5-14b-instruct": "Qwen/Qwen2.5-14B-Instruct",
+        "qwen2.5-32b-instruct": "Qwen/Qwen2.5-32B-Instruct",
+        "qwen2.5-72b-instruct": "Qwen/Qwen2.5-72B-Instruct",
+        "qwen2.5-coder-1.5b-instruct": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+        "qwen2.5-coder-7b-instruct": "Qwen/Qwen2.5-Coder-7B-Instruct",
+        "qwen2.5-coder-14b-instruct-awq": "Qwen/Qwen2.5-Coder-14B-Instruct-AWQ",
+        "qwen2.5-coder-32b-instruct": "Qwen/Qwen2.5-Coder-32B-Instruct",
+        "qwen3-8b": "Qwen/Qwen3-8B",
+        "qwen3-30b-a3b": "Qwen/Qwen3-30B-A3B",
+        "llama-3.2-1b": "meta-llama/Llama-3.2-1B-Instruct",
+        "llama-3.2-3b": "meta-llama/Llama-3.2-3B-Instruct",
+        "llama-3.1-8b": "meta-llama/Llama-3.1-8B-Instruct",
+        "llama-3.1-70b": "meta-llama/Llama-3.1-70B-Instruct",
+        "mixtral-8x7b": "mistralai/Mixtral-8x7B-Instruct-v0.1",
         "deepseek-1.3b": "deepseek-ai/deepseek-coder-1.3b-base",
         "deepseek-6.7b": "deepseek-ai/deepseek-coder-6.7b-base",
         "codellama-7b": "codellama/CodeLlama-7b-hf",
@@ -95,8 +137,17 @@ def parse_arguments():
     parser.add_argument('--rtt_ms', type=float, default=50.0, help='Network RTT in milliseconds (20-100ms).')
     parser.add_argument('--bandwidth_mbps', type=float, default=100.0, help='Network bandwidth in Mbps.')
     parser.add_argument('--packet_loss_rate', type=float, default=0.0, help='Packet loss rate (0.0-0.05).')
+    parser.add_argument('--network_simulator', type=str, default="legacy", choices=["legacy", "research"], help='Network simulator implementation.')
+    parser.add_argument('--jitter_ms', type=float, default=5.0, help='Network jitter in milliseconds.')
+    parser.add_argument('--mtu_bytes', type=int, default=1500, help='Research network MTU in bytes.')
+    parser.add_argument('--reorder_rate', type=float, default=0.0, help='Research network packet reorder probability.')
+    parser.add_argument('--timeout_ms', type=float, default=200.0, help='Research network retransmission timeout in milliseconds.')
+    parser.add_argument('--max_retries', type=int, default=3, help='Research network max retransmission attempts.')
+    parser.add_argument('--loss_model', type=str, default="random", choices=["random", "gilbert_elliott"], help='Research network loss model.')
+    parser.add_argument('--jitter_model', type=str, default="uniform", choices=["uniform", "normal", "lognormal"], help='Research network jitter model.')
     parser.add_argument('--enable_adaptive_window', action='store_true', default=False, help='Enable adaptive window size (AWAS).')
     parser.add_argument('--enable_compression', action='store_true', default=False, help='Enable transmission compression.')
+    parser.add_argument('--compression_top_k', type=int, default=50, help='Top-k logits retained by compression; 0 uses full quantized logits.')
     parser.add_argument('--enable_fallback', action='store_true', default=False, help='Enable fallback mechanism.')
     parser.add_argument('--fallback_threshold_ms', type=float, default=200.0, help='Latency threshold for fallback (ms).')
     parser.add_argument('--device_edge', type=str, default="cpu", help='Device for edge/draft model.')
