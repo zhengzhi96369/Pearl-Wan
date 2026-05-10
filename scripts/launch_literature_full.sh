@@ -14,6 +14,8 @@ set -euo pipefail
 cd "$ROOT"
 export PEARL_RUN_ID="$RUN_ID"
 export PEARL_INCLUDE_SERVING=0
+export PEARL_DEVICE_EDGE="${PEARL_DEVICE_EDGE:-cuda:1}"
+export PEARL_DEVICE_CLOUD="${PEARL_DEVICE_CLOUD:-cuda:0}"
 bash scripts/pearl_lab.sh preempt
 bash scripts/pearl_lab.sh prepare strict-paper
 bash scripts/pearl_lab.sh run paper

@@ -86,42 +86,39 @@ class PEARLWANEngine:
         
         dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
         
+        def load_model(model_path, device_arg):
+            kwargs = {
+                "torch_dtype": dtype,
+                "trust_remote_code": True,
+            }
+            if device_arg not in {"cpu"} and not str(device_arg).startswith("cuda:"):
+                kwargs["device_map"] = device_arg
+            model = AutoModelForCausalLM.from_pretrained(model_path, **kwargs).eval()
+            if device_arg == "cpu":
+                model = model.to("cpu")
+            elif str(device_arg).startswith("cuda:"):
+                model = model.to(device_arg)
+            return model
+
         # Handle transformers version differences for torch_dtype
         try:
-            self.draft_model = AutoModelForCausalLM.from_pretrained(
-                self.args.draft_model_path,
-                torch_dtype=dtype,
-                trust_remote_code=True,
-                device_map=self.args.device_edge if self.args.device_edge != "cpu" else None,
-            ).eval()
+            self.draft_model = load_model(self.args.draft_model_path, self.args.device_edge)
         except TypeError:
             # Older transformers versions may not support torch_dtype param name
             self.draft_model = AutoModelForCausalLM.from_pretrained(
                 self.args.draft_model_path,
                 dtype=dtype,
                 trust_remote_code=True,
-                device_map=self.args.device_edge if self.args.device_edge != "cpu" else None,
-            ).eval()
+            ).eval().to(self.args.device_edge)
         
         try:
-            self.target_model = AutoModelForCausalLM.from_pretrained(
-                self.args.target_model_path,
-                torch_dtype=dtype,
-                trust_remote_code=True,
-                device_map=self.args.device_cloud if self.args.device_cloud != "cpu" else None,
-            ).eval()
+            self.target_model = load_model(self.args.target_model_path, self.args.device_cloud)
         except TypeError:
             self.target_model = AutoModelForCausalLM.from_pretrained(
                 self.args.target_model_path,
                 dtype=dtype,
                 trust_remote_code=True,
-                device_map=self.args.device_cloud if self.args.device_cloud != "cpu" else None,
-            ).eval()
-        
-        if self.args.device_edge == "cpu":
-            self.draft_model = self.draft_model.to("cpu")
-        if self.args.device_cloud == "cpu":
-            self.target_model = self.target_model.to("cpu")
+            ).eval().to(self.args.device_cloud)
         
         print(f"[PEARL-WAN] Models loaded successfully.")
     
